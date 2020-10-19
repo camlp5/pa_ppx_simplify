@@ -1,4 +1,9 @@
 
+pa_ppx_simplify Version 0.07
+----------------------------
+
+* [19 Oct 2020] restart, by copying over hashconsed camlp5 AST and using that as a basis.
+
 pa_ppx_simplify Version 0.01
 ----------------------------
 
