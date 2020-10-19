@@ -1,0 +1,199 @@
+(* camlp5r *)
+(* pa_sexp.ml,v *)
+(* Copyright (c) INRIA 2007-2017 *)
+
+open Asttools
+open MLast
+open Pcaml
+
+open Pa_camlp5
+open Q_ast 
+
+module Regular = struct
+
+module MetaE = struct
+  include Q_ast_base.E_MetaSig
+  let int n = let loc = Ploc.dummy in <:expr< $int:string_of_int n$ >>
+end
+
+module MetaP = struct
+  include Q_ast_base.P_MetaSig
+  let int n = let loc = Ploc.dummy in <:patt< $int:string_of_int n$ >>
+end
+
+[%%import: Camlp5_ast.expr]
+[@@deriving q_ast {
+    data_source_module = Camlp5_ast
+  ; expr_meta_module = MetaE
+  ; patt_meta_module = MetaP
+ }]
+
+end
+
+module OK = struct
+module MetaE = Regular.MetaE
+module MetaP = Regular.MetaP
+
+[%%import: Camlp5_hashcons.OK.expr]
+[@@deriving q_ast {
+    data_source_module = Camlp5_hashcons.OK
+  ; expr_meta_module = MetaE
+  ; patt_meta_module = MetaP
+  ; pertype = {
+      class_expr_node = {
+        custom_branches_code = function
+          | CeXtr (loc, s, _) → C.xtr loc s
+      }
+
+    ; class_type_node = {
+        custom_branches_code = function
+          | CtXtr (loc, s, _) → C.xtr loc s
+      }
+
+    ; ctyp_node = {
+        custom_branches_code = function
+          | TyXtr(loc, s, _) → C.xtr loc s
+      }
+
+    ; expr_node = {
+        custom_branches_code = function
+          | ExXtr(loc, s, _) → C.xtr_or_anti loc (fun r → C.node "ExAnt" [r]) s
+      }
+
+    ; longid_node = {
+        custom_branches_code = function
+          | LiXtr(loc, s, _) → C.xtr_typed "longid" loc s
+      }
+
+    ; module_type_node = {
+        custom_branches_code = function
+          | MtXtr (loc, s, _) → C.xtr loc s          
+      }
+
+    ; module_expr_node = {
+        custom_branches_code = function
+          | MeXtr (loc, s, _) → C.xtr loc s          
+      }
+
+    ; patt_node = {
+        custom_branches_code = function
+          | PaXtr (loc, s, _) → C.xtr_or_anti loc (fun r → C.node "PaAnt" [r]) s
+      }
+    }
+  }]
+
+List.map (fun (n,f) -> Quotation.add n f)
+[
+#include "ok_quotations.tmp"
+]
+end
+
+module Hashcons = struct
+
+module MetaE = struct
+  include Regular.MetaE
+  let app_no_loc ?prefix fid el =
+    let prefix = match prefix with None -> <:longident< MLast >> | Some p -> p in
+    List.fold_left (fun e1 e2 -> <:expr< $e1$ $e2$ >>)
+      <:expr< $longid:prefix$ . $lid:fid$ >> el
+end
+
+module MetaP = struct
+  include Regular.MetaP
+end
+
+[%%import: Camlp5_hashcons.HC.expr]
+[@@deriving q_ast {
+    data_source_module = Camlp5_hashcons.HC
+  ; quotation_source_module = Camlp5_migrate.FromHC
+  ; expr_meta_module = MetaE
+  ; patt_meta_module = MetaP
+  ; hashconsed = true
+  ; pertype = {
+      class_expr_node = {
+        custom_branches_code = function
+          | CeXtr (loc, s, _) → C.xtr loc s
+      }
+    ; class_expr = {
+        add_branches_patt_code = function
+          | {Hashcons.node=CeXtr (loc, s, _)} → C.xtr loc s
+      }
+
+    ; class_type_node = {
+        custom_branches_code = function
+          | CtXtr (loc, s, _) → C.xtr loc s
+      }
+    ; class_type = {
+        add_branches_patt_code = function
+          | {Hashcons.node=CtXtr (loc, s, _)} → C.xtr loc s
+      }
+
+    ; ctyp_node = {
+        custom_branches_code = function
+          | TyXtr(loc, s, _) → C.xtr loc s
+      }
+
+    ; ctyp = {
+        add_branches_patt_code = function
+          | {Hashcons.node=TyXtr(loc, s, _)} → C.xtr loc s
+      }
+
+    ; expr_node = {
+        custom_branches_code = function
+          | ExXtr(loc, s, _) → C.xtr_or_anti loc (fun r → C.node "ExAnt" [r]) s
+      }
+    ; expr = {
+        add_branches_patt_code = function
+          | {Hashcons.node=ExXtr(loc, s, _)} → C.xtr_or_anti loc (fun r → C.node "ExAnt" [r]) s
+      }
+
+    ; longid_node = {
+        custom_branches_code = function
+          | LiXtr(loc, s, _) → C.xtr_typed "longid" loc s
+      }
+    ; longid = {
+        add_branches_patt_code = function
+          | {Hashcons.node=LiXtr(loc, s, _)} → C.xtr_typed "longid" loc s
+      }
+
+    ; module_expr_node = {
+        custom_branches_code = function
+          | MeXtr (loc, s, _) → C.xtr loc s          
+      }
+
+    ; module_expr = {
+        add_branches_patt_code = function
+          | {Hashcons.node=MeXtr (loc, s, _)} → C.xtr loc s          
+      }
+
+
+    ; module_type_node = {
+        custom_branches_code = function
+          | MtXtr (loc, s, _) → C.xtr loc s          
+      }
+
+    ; module_type = {
+        add_branches_patt_code = function
+          | {Hashcons.node=MtXtr (loc, s, _)} → C.xtr loc s          
+      }
+
+    ; patt_node = {
+        custom_branches_code = function
+          | PaXtr (loc, s, _) → C.xtr_or_anti loc (fun r → C.node "PaAnt" [r]) s
+      }
+
+    ; patt = {
+        add_branches_patt_code = function
+          | {Hashcons.node=PaXtr (loc, s, _)} → C.xtr_or_anti loc (fun r → C.node "PaAnt" [r]) s
+      }
+
+    }
+  }]
+
+List.map (fun (n,f) -> Quotation.add n f)
+[
+#include "hc_quotations.tmp"
+]
+
+end
+

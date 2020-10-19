@@ -8,7 +8,7 @@ WD=$(shell pwd)
 DESTDIR=
 RM=rm
 
-SYSDIRS= pa_simplify
+SYSDIRS= hashcons_mlast pa_simplify
 
 TESTDIRS= tests
 
