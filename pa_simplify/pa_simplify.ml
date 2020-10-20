@@ -50,7 +50,7 @@ module OrNot = struct
     KNOWN l -> l | UNKNOWN -> raise Fail ];
 end ;
 
-module FVS = struct
+module FVS1 = struct
   type t = OrNot.t FVS0.t ;
   value ofList l = OrNot.known (FVS0.ofList l) ;
   value unknown () = OrNot.unknown() ;
@@ -71,9 +71,25 @@ module FVS = struct
     OrNot.bind l (fun l -> OrNot.known (FVS0.exceptl ~{bound} l)) ;
 end ;
 
+module FVS = struct
+  type t = { free : FVS0.t ; maybe_free : FVS0.t } ;
+  value ofList l = { free = FVS0.ofList l ; maybe_free = FVS0.ofList [] } ;
+  value union l1 l2 = { free = FVS0.union l1.free l2.free ; maybe_free = FVS0.union l1.maybe_free l2.maybe_free } ;
+  value free_in x l = FVS0.free_in x l.free ;
+  value not_free_in x l =
+    FVS0.not_free_in x l.free && FVS0.not_free_in x l.maybe_free ;
+  value except id l =
+    { (l) with free = FVS0.except id l.free } ;
+  value exceptl ~{bound} l =
+    { (l) with free = FVS0.exceptl ~{bound} l.free } ;
+
+  value maybe l = { free = FVS0.ofList [] ; maybe_free = FVS0.union l.maybe_free l.free } ;
+end ;
+
 value patt_bound_vars p =
   let rec patrec = fun [
-      <:hcpatt< $lid:x$ >> -> [x]
+      <:hcpatt< _ >> -> []
+    | <:hcpatt< $lid:x$ >> -> [x]
     | <:hcpatt< $p1$ $p2$ >> -> (patrec p1)@(patrec p2)
     | <:hcpatt< ( $list:l$ ) >> -> List.concat (List.map patrec l)
     | <:hcpatt< $longid:_$ >> -> []
@@ -92,6 +108,13 @@ value freevars0 =
   let fvrec e = memo_freevars.val e in
   let fvrec0 = fun [
       <:hcexpr< $lid:id$ >> -> FVS.ofList [id]
+
+    | <:hcexpr< $longid:_$ >> -> FVS.ofList []
+    | <:hcexpr< $longid:_$ . ( $e$ ) >> ->
+      FVS.maybe (fvrec e)
+
+    | <:hcexpr< $e$ . $lilongid:_$ >> -> fvrec e
+
     | <:hcexpr< fun [ $list:branches$ ] >> ->
       let fv_branch (p, whene, rhs) =
         let bvars = patt_bound_vars p in
@@ -99,9 +122,23 @@ value freevars0 =
         let rhs_fvs = fvrec rhs in
         FVS.exceptl ~{bound=bvars} (FVS.union whene_fvs rhs_fvs) in
       List.fold_left FVS.union (FVS.ofList[]) (List.map fv_branch branches)
+
+    | <:hcexpr< match $e$ with [ $list:branches$ ] >> ->
+      let fv_branch (p, whene, rhs) =
+        let bvars = patt_bound_vars p in
+        let whene_fvs = match uv whene with [ None -> FVS.ofList [] | Some e -> fvrec e ] in
+        let rhs_fvs = fvrec rhs in
+        FVS.exceptl ~{bound=bvars} (FVS.union whene_fvs rhs_fvs) in
+      List.fold_left FVS.union (fvrec e) (List.map fv_branch branches)
+
     | <:hcexpr< $e1$ $e2$ >> -> FVS.union (fvrec e1) (fvrec e2)
     | <:hcexpr< ( $list:l$ ) >> -> List.fold_left FVS.union (FVS.ofList[]) (List.map fvrec l)
-    | _ -> FVS.unknown ()
+
+    | <:hcexpr< $int:_$ >> | <:hcexpr< $str:_$ >> -> FVS.ofList[]
+
+    | z -> 
+      let z = Camlp5_migrate.FromHC.expr z in
+      Ploc.raise (MLast.loc_of_expr z) (Failure Fmt.(str "freevars: unhandled expression:@ %a\n%!" Pp_MLast.pp_expr z))
   ] in do {
     memo_freevars.val := Camlp5_hashcons.HC.memo_expr fvrec0 ;
     fvrec
@@ -148,7 +185,6 @@ value patt_alpha_subst rho p =
 
 value rec subst rho z =
   let fvz = freevars z in
-  if FVS.is_unknown fvz then raise Fail else
   match z with [
     <:hcexpr:< $lid:id$ >> as z ->
     if List.mem_assoc id rho then List.assoc id rho else z
@@ -199,6 +235,8 @@ value rec subst rho z =
             (p, Pcaml.vala_map (Option.map (subst rho)) whene, subst rho rhs)
           } in
     <:hcexpr< match $subst rho e$ with [ $list:List.map subst_branch branches$ ] >>
+
+    | <:hcexpr< $int:_$ >> | <:hcexpr< $str:_$ >> as z -> z
   ]
 ;
 
