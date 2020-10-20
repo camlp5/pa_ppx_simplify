@@ -12,7 +12,7 @@ LAUNCH=env TOP=$(TOP) $(TOP)/tools/LAUNCH
 OCAMLFIND=$(LAUNCH) ocamlfind
 NOT_OCAMLFIND=$(LAUNCH) not-ocamlfind
 MKCAMLP5=$(LAUNCH) mkcamlp5
-PACKAGES := $(PACKAGES),pa_ppx.deriving_plugins.show,pa_ppx.base,pa_ppx.utils,pa_ppx.unmatched_vala
+PACKAGES := $(PACKAGES),pcre,camlp5.extfun,pa_ppx.deriving_plugins.show,pa_ppx.base,pa_ppx.utils,pa_ppx.unmatched_vala,hashcons_mlast.parser_quotations
 
 ML=\
 	pa_simplify.ml \
@@ -49,7 +49,7 @@ $(CMO) $(CMI) $(CMX): $(EXTERNAL)
 
 depend::
 	echo "$(CMO) $(CMI) $(CMX): $(EXTERNAL)" > .depend.NEW
-	$(OCAMLFIND) ocamldep $(DEBUG) -package $(PACKAGES) -syntax camlp5r *.ml *.mli >> .depend.NEW \
+	$(OCAMLFIND) ocamldep -package $(PACKAGES) -syntax camlp5r *.ml *.mli >> .depend.NEW \
 		&& mv .depend.NEW .depend
 
 -include .depend
