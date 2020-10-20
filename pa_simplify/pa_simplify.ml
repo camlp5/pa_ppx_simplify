@@ -53,6 +53,8 @@ end ;
 module FVS = struct
   type t = OrNot.t FVS0.t ;
   value ofList l = OrNot.known (FVS0.ofList l) ;
+  value unknown () = OrNot.unknown() ;
+  value is_unknown fvs = OrNot.is_unknown fvs ;
   value union l1 l2 =
     OrNot.bind l1 (fun l1 -> OrNot.bind l2 (fun l2 -> OrNot.known (FVS0.union l1 l2))) ;
   value free_in x l =
@@ -99,7 +101,7 @@ value freevars0 =
       List.fold_left FVS.union (FVS.ofList[]) (List.map fv_branch branches)
     | <:hcexpr< $e1$ $e2$ >> -> FVS.union (fvrec e1) (fvrec e2)
     | <:hcexpr< ( $list:l$ ) >> -> List.fold_left FVS.union (FVS.ofList[]) (List.map fvrec l)
-    | _ -> OrNot.unknown ()
+    | _ -> FVS.unknown ()
   ] in do {
     memo_freevars.val := Camlp5_hashcons.HC.memo_expr fvrec0 ;
     fvrec
@@ -146,7 +148,7 @@ value patt_alpha_subst rho p =
 
 value rec subst rho z =
   let fvz = freevars z in
-  if OrNot.is_unknown fvz then raise Fail else
+  if FVS.is_unknown fvz then raise Fail else
   match z with [
     <:hcexpr:< $lid:id$ >> as z ->
     if List.mem_assoc id rho then List.assoc id rho else z
