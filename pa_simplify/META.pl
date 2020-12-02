@@ -19,8 +19,9 @@ description = "pa_ppx_simplify deriver"
     archive(syntax,preprocessor,native) = "pa_simplify.cmx"
 
   package "link" (
-  requires(byte) = "camlp5,pa_ppx.base.link,pa_ppx.deriving_plugins.show.link,hashcons_mlast.runtime"
+  requires = "camlp5,pa_ppx.base.link,pa_ppx.deriving_plugins.show.link,hashcons_mlast.runtime"
   archive(byte) = "pa_simplify.cmo"
+  archive(native) = "pa_simplify.cmx"
   )
   requires = "camlp5,pa_ppx.base,pa_ppx.deriving_plugins.show,pa_ppx.runtime,hashcons_mlast.runtime"
 
